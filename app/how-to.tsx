@@ -1,60 +1,66 @@
+import { Text } from "../src/components/Typography";
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
-import { Button, Screen } from "../src/components/ui";
+import { StyleSheet, View } from "react-native";
+import { BentoArt } from "../src/components/BentoArt";
+import { Icon } from "../src/components/Icon";
+import { Button, Eyebrow, Page, Panel, textStyles } from "../src/components/ui";
 import { colors } from "../src/theme/theme";
-
 const STEPS = [
-  { title: "Cut a block", copy: "Drag across a piece to split it." },
-  { title: "Move the pieces", copy: "Switch to Move and drag each piece." },
-  { title: "Fill the target", copy: "Snap every piece into the tray." },
-];
-
+  {
+    icon: "cut",
+    title: "A little slice",
+    copy: "Choose Cut. Swipe across a block along the grid to split it. Your cut counter shows what’s left.",
+  },
+  {
+    icon: "move",
+    title: "Find its place",
+    copy: "Choose Move. Drag each piece into the tray. Tap a piece to select it, then rotate if the level allows it.",
+  },
+  {
+    icon: "check",
+    title: "That perfect fit",
+    copy: "Fill every square with no overlaps. Fewer cuts and hints earn more stars. Undo is always there for you.",
+  },
+] as const;
 export default function HowToScreen() {
   return (
-    <Screen>
-      <Text style={styles.kicker}>How to play</Text>
-      <Text style={styles.title}>Three moves</Text>
-      <View style={styles.list}>
-        {STEPS.map((step, index) => (
-          <View key={step.title} style={styles.row}>
-            <Text style={styles.index}>{index + 1}</Text>
-            <View style={styles.copy}>
-              <Text style={styles.step}>{step.title}</Text>
-              <Text style={styles.detail}>{step.copy}</Text>
-            </View>
-          </View>
-        ))}
+    <Page
+      title="A recipe for a perfect fit"
+      subtitle="Easy to learn. Lovely to master."
+    >
+      <View style={styles.art}>
+        <BentoArt />
       </View>
-      <Button label="Continue" onPress={() => router.replace("/home")} />
-    </Screen>
+      <Eyebrow>Three simple ingredients</Eyebrow>
+      {STEPS.map((step, i) => (
+        <Panel key={step.title} style={{ flexDirection: "row", gap: 18 }}>
+          <View style={styles.icon}>
+            <Icon name={step.icon} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={textStyles.heading}>
+              {i + 1}. {step.title}
+            </Text>
+            <Text style={textStyles.body}>{step.copy}</Text>
+          </View>
+        </Panel>
+      ))}
+      <Button
+        label="Back to the kitchen"
+        icon="arrow"
+        onPress={() => router.replace("/home")}
+      />
+    </Page>
   );
 }
-
 const styles = StyleSheet.create({
-  kicker: { color: colors.inkSoft, fontWeight: "800", letterSpacing: 0.4 },
-  title: { fontSize: 36, fontWeight: "900", color: colors.ink, marginBottom: 16 },
-  list: { flex: 1, gap: 12 },
-  row: {
-    flexDirection: "row",
-    gap: 12,
+  art: { height: 210, backgroundColor: colors.sage, borderRadius: 26 },
+  icon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     alignItems: "center",
-    backgroundColor: colors.cream,
-    borderRadius: 20,
-    padding: 14,
+    justifyContent: "center",
+    backgroundColor: colors.sage,
   },
-  index: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    overflow: "hidden",
-    textAlign: "center",
-    lineHeight: 36,
-    backgroundColor: colors.accent,
-    color: colors.cream,
-    fontWeight: "900",
-    fontSize: 18,
-  },
-  copy: { flex: 1 },
-  step: { fontSize: 18, fontWeight: "800", color: colors.ink },
-  detail: { color: colors.inkSoft, marginTop: 2, fontWeight: "600" },
 });

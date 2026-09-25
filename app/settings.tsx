@@ -1,48 +1,178 @@
+import { Text } from "../src/components/Typography";
 import { router } from "expo-router";
-import { StyleSheet, Switch, Text, View } from "react-native";
-import { Button, Screen } from "../src/components/ui";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
+import { Icon } from "../src/components/Icon";
+import { Button, Eyebrow, Page, Panel, textStyles } from "../src/components/ui";
 import { useProgress } from "../src/game/progressStore";
+import { useState } from "react";
+import { release } from "../src/game/release";
 import { colors } from "../src/theme/theme";
-
 export default function SettingsScreen() {
-  const sound = useProgress((state) => state.soundEnabled);
-  const haptics = useProgress((state) => state.hapticsEnabled);
-  const setSound = useProgress((state) => state.setSound);
-  const setHaptics = useProgress((state) => state.setHaptics);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const { soundEnabled, hapticsEnabled, setSound, setHaptics } = useProgress();
   return (
-    <Screen>
-      <Text style={styles.title}>Settings</Text>
-      <View style={styles.row}>
-        <Text style={styles.label}>Sound</Text>
-        <Switch value={sound} onValueChange={setSound} />
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Haptics</Text>
-        <Switch value={haptics} onValueChange={setHaptics} />
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.label}>How to play</Text>
-        <Text style={styles.copy}>Drag across a block to cut it. Switch to Move, then drag each piece onto the matching target cells. It snaps when the fit is real.</Text>
-      </View>
-      <Button label="Variations" tone="cream" onPress={() => router.push("/variations")} />
-      {__DEV__ ? <Button label="Generator inspector" tone="cream" onPress={() => router.push("/debug")} /> : null}
-      <Button label="Back" tone="cream" onPress={() => router.back()} />
-    </Screen>
+    <Page
+      title="Make yourself at home"
+      subtitle="The little things, just how you like them."
+      icon="settings"
+    >
+      <Eyebrow>Your atmosphere</Eyebrow>
+      <Panel>
+        {[
+          {
+            label: "Sound",
+            copy: "Soft sounds for every slice and snap",
+            value: soundEnabled,
+            change: setSound,
+          },
+          {
+            label: "Haptics",
+            copy: "A little feedback you can feel on your phone",
+            value: hapticsEnabled,
+            change: setHaptics,
+          },
+        ].map((item) => (
+          <View key={item.label} style={styles.row}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={textStyles.heading}>{item.label}</Text>
+              <Text style={styles.copy}>{item.copy}</Text>
+            </View>
+            <Switch
+              accessibilityLabel={item.label}
+              value={item.value}
+              onValueChange={item.change}
+              trackColor={{ true: colors.accent, false: colors.line }}
+            />
+          </View>
+        ))}
+      </Panel>
+      <Eyebrow>Around the kitchen</Eyebrow>
+      <Panel>
+        {[
+          { label: "How to play", icon: "help", route: "/how-to" },
+          {
+            label: "Different ways to play",
+            icon: "grid",
+            route: "/variations",
+          },
+          { label: "Your special tools", icon: "tools", route: "/tools" },
+          { label: "Your collection", icon: "palette", route: "/skins" },
+        ].map((item) => (
+          <Pressable
+            key={item.route}
+            accessibilityRole="button"
+            onPress={() => router.push(item.route as "/how-to")}
+            style={styles.link}
+          >
+            <Text style={textStyles.heading}>{item.label}</Text>
+            <Icon name="arrow" size={19} />
+          </Pressable>
+        ))}
+      </Panel>
+      <Eyebrow>Help & your data</Eyebrow>
+      <Panel>
+        {[
+          { label: "Support", route: "/support" },
+          { label: "Privacy", route: "/privacy" },
+          { label: "Credits & licenses", route: "/credits" },
+        ].map((item) => (
+          <Pressable
+            key={item.route}
+            accessibilityRole="button"
+            onPress={() => router.push(item.route as "/support")}
+            style={styles.link}
+          >
+            <Text style={textStyles.heading}>{item.label}</Text>
+            <Icon name="arrow" size={19} />
+          </Pressable>
+        ))}
+        <Text style={styles.copy}>
+          Progress is saved on this device. There is no cloud sync.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setConfirmReset(true)}
+          style={styles.link}
+        >
+          <Text style={{ ...textStyles.heading, color: colors.bad }}>
+            Reset saved progress
+          </Text>
+          <Icon name="reset" size={19} color={colors.bad} />
+        </Pressable>
+      </Panel>
+      <Text style={styles.footer}>Bento Blocks · {release.version}</Text>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={confirmReset}
+        onRequestClose={() => setConfirmReset(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+            backgroundColor: "#293D3277",
+          }}
+        >
+          <Panel style={{ width: "100%", maxWidth: 440, maxHeight: "100%" }}>
+            <ScrollView contentContainerStyle={{ gap: 12 }}>
+              <Text style={textStyles.heading}>Erase saved progress?</Text>
+              <Text style={textStyles.body}>
+                This removes all completed levels, stars, earned tools, daily
+                streaks, and preferences from this device. This cannot be
+                undone.
+              </Text>
+              <Button
+                label="Keep my progress"
+                onPress={() => setConfirmReset(false)}
+              />
+              <Button
+                label="Erase and start again"
+                tone="cream"
+                onPress={() => {
+                  useProgress.getState().resetProgress();
+                  setConfirmReset(false);
+                  router.replace("/home");
+                }}
+              />
+            </ScrollView>
+          </Panel>
+        </View>
+      </Modal>
+      {__DEV__ && (
+        <Pressable
+          accessibilityRole="button"
+          style={{ minHeight: 44, justifyContent: "center" }}
+          onPress={() => router.push("/debug")}
+        >
+          <Text style={styles.footer}>Generator inspector</Text>
+        </Pressable>
+      )}
+    </Page>
   );
 }
-
 const styles = StyleSheet.create({
-  title: { fontSize: 32, fontWeight: "900", color: colors.ink, marginBottom: 12 },
   row: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: colors.cream,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+    gap: 18,
+    paddingVertical: 12,
   },
-  label: { fontWeight: "800", color: colors.ink, fontSize: 16 },
-  card: { backgroundColor: colors.cream, borderRadius: 16, padding: 14, marginBottom: 12 },
-  copy: { color: colors.inkSoft, marginTop: 6 },
+  copy: { fontSize: 13, color: colors.inkSoft, lineHeight: 20 },
+  link: {
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  footer: { textAlign: "center", fontSize: 12, color: colors.inkSoft },
 });

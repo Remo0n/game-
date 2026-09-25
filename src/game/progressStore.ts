@@ -1,146 +1,99 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { GENERATOR_VERSION, type ToolKit, type Variation } from "../engine/types";
+import type { ToolKit } from "../engine/types";
 import { createCampaignSeed } from "./vault";
+import {
+  finishRun,
+  initialProgress,
+  restoreProgress,
+  type CompletedRun,
+  type ProgressData,
+} from "./progress";
+export { progressKey, runKey } from "./progress";
 
-export interface LevelResult {
-  stars: number;
-  bestScore: number;
-}
-
-const emptyVariationLevels = (): Record<Variation, number> => ({
-  NORMAL: 1,
-  ONE_CUT: 1,
-  NO_ROTATION: 1,
-  EXACT_FIT: 1,
-  TIMED: 1,
-  MULTI_BLOCK: 1,
-});
-
-interface ProgressState {
-  campaignSeed: number;
-  levelNumber: number;
-  variationLevel: Record<Variation, number>;
-  results: Record<string, LevelResult>;
-  totalStars: number;
-  streak: number;
-  lastDailyDate: string | null;
-  dailyCompletedDate: string | null;
-  weekKey: string;
-  weeklyDailyCount: number;
-  weeklyRewardClaimed: boolean;
-  wallet: ToolKit;
-  selectedSkin: string;
-  selectedTray: string;
-  selectedBackground: string;
-  soundEnabled: boolean;
-  hapticsEnabled: boolean;
-  recentSignatures: string[];
-  recordResult: (key: string, stars: number, score: number) => boolean;
-  advanceCampaign: () => void;
-  setVariationLevel: (variation: Variation, level: number) => void;
+export const useSaveStatus = create<{
+  hydrated: boolean;
+  loadError: boolean;
+  saveError: boolean;
+}>(() => ({ hydrated: false, loadError: false, saveError: false }));
+let pendingWrite = Promise.resolve();
+interface ProgressState extends ProgressData {
+  completeRun: (run: CompletedRun) => void;
   rememberSignature: (signature: string) => void;
-  completeDaily: (date: string, week: string) => void;
-  grantTool: () => void;
   setLook: (kind: "skin" | "tray" | "background", id: string) => void;
   setSound: (enabled: boolean) => void;
   setHaptics: (enabled: boolean) => void;
   spendWallet: (tool: keyof ToolKit) => void;
+  resetProgress: () => void;
 }
-
-export function progressKey(mode: string, levelNumber: number): string {
-  return `${GENERATOR_VERSION}:${mode}:${levelNumber}`;
-}
-
-function previousDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  const value = new Date(year, month - 1, day);
-  value.setDate(value.getDate() - 1);
-  const nextMonth = String(value.getMonth() + 1).padStart(2, "0");
-  const nextDay = String(value.getDate()).padStart(2, "0");
-  return `${value.getFullYear()}-${nextMonth}-${nextDay}`;
-}
-
 export const useProgress = create<ProgressState>()(
   persist(
     (set) => ({
-      campaignSeed: createCampaignSeed(),
-      levelNumber: 1,
-      variationLevel: emptyVariationLevels(),
-      results: {},
-      totalStars: 0,
-      streak: 0,
-      lastDailyDate: null,
-      dailyCompletedDate: null,
-      weekKey: "",
-      weeklyDailyCount: 0,
-      weeklyRewardClaimed: false,
-      wallet: { laser: 0, lineSplit: 0, rotate: 0, extraCut: 0 },
-      selectedSkin: "classic",
-      selectedTray: "wood",
-      selectedBackground: "kitchen",
-      soundEnabled: true,
-      hapticsEnabled: true,
-      recentSignatures: [],
-      recordResult: (key, stars, score) => {
-        let perfect = false;
-        set((state) => {
-          const previous = state.results[key];
-          const bestStars = Math.max(previous?.stars ?? 0, stars);
-          const bestScore = Math.max(previous?.bestScore ?? 0, score);
-          perfect = stars === 3 && (previous?.stars ?? 0) < 3;
-          return {
-            results: { ...state.results, [key]: { stars: bestStars, bestScore } },
-            totalStars: state.totalStars + (bestStars - (previous?.stars ?? 0)),
-          };
-        });
-        return perfect;
-      },
-      advanceCampaign: () => set((state) => ({ levelNumber: state.levelNumber + 1 })),
-      setVariationLevel: (variation, level) =>
-        set((state) => ({ variationLevel: { ...state.variationLevel, [variation]: level } })),
+      ...initialProgress(createCampaignSeed()),
+      completeRun: (run) => set((state) => finishRun(state, run)),
       rememberSignature: (signature) =>
-        set((state) => ({ recentSignatures: [...state.recentSignatures, signature].slice(-80) })),
-      completeDaily: (date, week) =>
-        set((state) => {
-          if (state.dailyCompletedDate === date) return state;
-          const streak = state.lastDailyDate === previousDate(date) ? state.streak + 1 : 1;
-          const sameWeek = state.weekKey === week;
-          const weeklyDailyCount = (sameWeek ? state.weeklyDailyCount : 0) + 1;
-          return {
-            streak,
-            lastDailyDate: date,
-            dailyCompletedDate: date,
-            weekKey: week,
-            weeklyDailyCount,
-            weeklyRewardClaimed: state.weeklyRewardClaimed || weeklyDailyCount >= 3,
-          };
-        }),
-      spendWallet: (tool: keyof ToolKit) =>
-        set((state) => {
-          if (state.wallet[tool] <= 0) return state;
-          return { wallet: { ...state.wallet, [tool]: state.wallet[tool] - 1 } };
-        }),
-      grantTool: () =>
-        set((state) => {
-          const order: Array<keyof ToolKit> = ["lineSplit", "extraCut", "laser", "rotate"];
-          const tool = order.find((name) => state.wallet[name] < 3) ?? "lineSplit";
-          if (state.wallet[tool] >= 3) return state;
-          return { wallet: { ...state.wallet, [tool]: state.wallet[tool] + 1 } };
-        }),
+        set((state) => ({
+          recentSignatures: [...state.recentSignatures, signature].slice(-80),
+        })),
+      spendWallet: (tool) =>
+        set((state) => ({
+          wallet: {
+            ...state.wallet,
+            [tool]: Math.max(0, state.wallet[tool] - 1),
+          },
+        })),
       setLook: (kind, id) =>
-        set(() => {
-          if (kind === "skin") return { selectedSkin: id };
-          if (kind === "tray") return { selectedTray: id };
-          return { selectedBackground: id };
-        }),
+        set(
+          kind === "skin"
+            ? { selectedSkin: id }
+            : kind === "tray"
+              ? { selectedTray: id }
+              : { selectedBackground: id },
+        ),
       setSound: (soundEnabled) => set({ soundEnabled }),
       setHaptics: (hapticsEnabled) => set({ hapticsEnabled }),
+      resetProgress: () => set(initialProgress(createCampaignSeed())),
     }),
     {
       name: "bento-progress",
-      storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      storage: createJSONStorage(() => ({
+        getItem: (name) => AsyncStorage.getItem(name),
+        removeItem: (name) => AsyncStorage.removeItem(name),
+        setItem: (name, value) => {
+          // Serialize native writes so an older snapshot can never overwrite a newer one.
+          pendingWrite = pendingWrite
+            .then(() => AsyncStorage.setItem(name, value))
+            .then(
+              () => useSaveStatus.setState({ saveError: false }),
+              () => useSaveStatus.setState({ saveError: true }),
+            );
+          return pendingWrite;
+        },
+      })),
+      migrate: (saved) => restoreProgress(saved, createCampaignSeed()),
+      merge: (saved, current) => ({
+        ...current,
+        ...restoreProgress(saved, current.campaignSeed),
+      }),
+      onRehydrateStorage: () => {
+        useSaveStatus.setState({ hydrated: false, loadError: false });
+        return (_state, error) =>
+          useSaveStatus.setState({
+            hydrated: !error,
+            loadError: Boolean(error),
+          });
+      },
     },
   ),
 );
+
+/** Only called after the player confirms erasing an unreadable save. */
+export async function resetUnreadableProgress(): Promise<void> {
+  useProgress.getState().resetProgress();
+  await pendingWrite;
+  if (!useSaveStatus.getState().saveError) {
+    useSaveStatus.setState({ hydrated: true, loadError: false });
+  }
+}

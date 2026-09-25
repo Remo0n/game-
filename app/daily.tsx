@@ -1,51 +1,146 @@
+import { Text } from "../src/components/Typography";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { Button, Screen } from "../src/components/ui";
-import { formatDate, secondsUntilMidnight, weekKey } from "../src/engine/generator/daily";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { BentoArt } from "../src/components/BentoArt";
+import { Icon } from "../src/components/Icon";
+import { Button, Eyebrow, Page, Panel, textStyles } from "../src/components/ui";
+import {
+  formatDate,
+  secondsUntilMidnight,
+  weekKey,
+} from "../src/engine/generator/daily";
 import { useProgress } from "../src/game/progressStore";
-import { colors } from "../src/theme/theme";
-
+import { colors, fonts } from "../src/theme/theme";
 export default function DailyScreen() {
+  const { width, fontScale } = useWindowDimensions();
   const [now, setNow] = useState(() => new Date());
-  const completed = useProgress((state) => state.dailyCompletedDate);
-  const streak = useProgress((state) => state.streak);
-  const weekly = useProgress((state) => state.weeklyDailyCount);
-  const date = formatDate(now);
-  const done = completed === date;
-
+  const {
+    dailyCompletedDate,
+    streak,
+    weeklyDailyCount,
+    weekKey: savedWeek,
+  } = useProgress();
+  const date = formatDate(now),
+    done = dailyCompletedDate === date;
+  const weekly = savedWeek === weekKey(now) ? weeklyDailyCount : 0;
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
   const remain = secondsUntilMidnight(now);
-  const clock = `${Math.floor(remain / 3600)}:${String(Math.floor((remain % 3600) / 60)).padStart(2, "0")}:${String(remain % 60).padStart(2, "0")}`;
-
+  const clock = `${String(Math.floor(remain / 3600)).padStart(2, "0")}:${String(Math.floor((remain % 3600) / 60)).padStart(2, "0")}:${String(remain % 60).padStart(2, "0")}`;
   return (
-    <Screen>
-      <Text style={styles.title}>Daily Challenge</Text>
-      <Text style={styles.sub}>{date}</Text>
-      <View style={styles.card}>
-        <Text style={styles.clock}>{clock}</Text>
-        <Text style={styles.sub}>Streak {streak} · this week {weekly}/3</Text>
-        <Text style={styles.sub}>Complete 3 challenges this week to get a special skin.</Text>
+    <Page
+      title="The daily bento"
+      subtitle={now.toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })}
+      icon="sun"
+    >
+      <View style={styles.hero}>
+        <Eyebrow color="#99774F">Made fresh, every day</Eyebrow>
+        <View style={styles.art}>
+          <BentoArt variant="daily" />
+        </View>
+        <Text style={styles.title}>
+          {done ? "Beautifully packed." : "A fresh little challenge."}
+        </Text>
+        <Text style={styles.copy}>
+          {done
+            ? "Your daily ritual is complete. See you tomorrow."
+            : "A new arrangement to make your own. Take your time."}
+        </Text>
       </View>
       <Button
-        label={done ? "Already solved today" : "Play"}
+        label={done ? "Today’s bento is complete" : "Pack today’s bento"}
         disabled={done}
-        onPress={() => router.push({ pathname: "/intro", params: { source: "daily", date, level: "7" } })}
+        icon={done ? "check" : "arrow"}
+        onPress={() =>
+          router.push({
+            pathname: "/play",
+            params: { source: "daily", date, level: "7" },
+          })
+        }
       />
-      <Text style={styles.week}>Week {weekKey(now)}</Text>
-      <Button label="Back" tone="cream" onPress={() => router.back()} />
-    </Screen>
+      <View
+        style={[
+          styles.stats,
+          (width < 380 || fontScale > 1.15) && { flexDirection: "column" },
+        ]}
+      >
+        <Panel style={{ flex: 1 }}>
+          <Icon name="spark" color={colors.gold} />
+          <Text style={styles.stat}>
+            {streak} {streak === 1 ? "day" : "days"}
+          </Text>
+          <Text style={styles.small}>Current streak</Text>
+        </Panel>
+        <Panel style={{ flex: 1 }}>
+          <Icon name="clock" color={colors.accent} />
+          <Text style={styles.stat}>{clock}</Text>
+          <Text style={styles.small}>Next fresh bento</Text>
+        </Panel>
+      </View>
+      <Panel>
+        <Eyebrow>A treat for your collection</Eyebrow>
+        <Text style={textStyles.heading}>Three days. One special skin.</Text>
+        <View style={styles.stamps}>
+          {[1, 2, 3].map((n) => (
+            <View
+              key={n}
+              style={[
+                styles.stamp,
+                n <= weekly && { backgroundColor: colors.accent },
+              ]}
+            >
+              <Icon
+                name={n <= weekly ? "check" : "sun"}
+                color={n <= weekly ? colors.cream : "#A9B19E"}
+              />
+            </View>
+          ))}
+        </View>
+        <Text style={textStyles.body}>
+          {Math.min(weekly, 3)} of 3 challenges completed this week.
+        </Text>
+      </Panel>
+    </Page>
   );
 }
-
 const styles = StyleSheet.create({
-  title: { fontSize: 32, fontWeight: "900", color: colors.ink },
-  sub: { color: colors.inkSoft, fontWeight: "700", marginTop: 6 },
-  card: { backgroundColor: colors.cream, borderRadius: 24, padding: 16, marginVertical: 16 },
-  clock: { fontSize: 28, fontWeight: "900", color: colors.ink },
-  week: { textAlign: "center", marginVertical: 12, color: colors.inkSoft },
+  hero: {
+    padding: 24,
+    backgroundColor: colors.peach,
+    borderRadius: 28,
+    alignItems: "center",
+  },
+  art: { height: 230, width: "100%" },
+  title: {
+    fontFamily: fonts.display,
+    fontSize: 29,
+    color: colors.ink,
+    textAlign: "center",
+  },
+  copy: {
+    marginTop: 10,
+    color: colors.inkSoft,
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  stats: { flexDirection: "row", gap: 12 },
+  stat: { fontSize: 23, color: colors.ink, fontFamily: fonts.display },
+  small: { color: colors.inkSoft, fontSize: 12 },
+  stamps: { flexDirection: "row", gap: 12, marginVertical: 6 },
+  stamp: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: colors.sage,
+  },
 });

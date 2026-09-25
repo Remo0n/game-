@@ -1,337 +1,576 @@
+import { Text } from "../src/components/Typography";
 import { router } from "expo-router";
-import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Screen } from "../src/components/ui";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { BentoArt } from "../src/components/BentoArt";
+import { Icon } from "../src/components/Icon";
+import {
+  Button,
+  Eyebrow,
+  IconButton,
+  Navigation,
+  Screen,
+  Stars,
+} from "../src/components/ui";
 import { formatDate } from "../src/engine/generator/daily";
 import { progressKey, useProgress } from "../src/game/progressStore";
-import { colors, WORLDS, worldForLevel } from "../src/theme/theme";
-
-const art = {
-  background: require("../assets/ui/home-bg.png"),
-  logo: require("../assets/ui/logo.png"),
-  diorama: require("../assets/ui/diorama.png"),
-  tabi: require("../assets/ui/tabi.png"),
-  avatar: require("../assets/ui/avatar.png"),
-  daily: require("../assets/ui/icon-daily.png"),
-  rewards: require("../assets/ui/icon-rewards.png"),
-  leaderboard: require("../assets/ui/icon-leaderboard.png"),
-  skins: require("../assets/ui/icon-skins.png"),
-  trays: require("../assets/ui/icon-trays.png"),
-  worlds: require("../assets/ui/icon-worlds.png"),
-  shop: require("../assets/ui/icon-shop.png"),
-  settings: require("../assets/ui/icon-settings.png"),
-  coin: require("../assets/ui/icon-coin.png"),
-  gem: require("../assets/ui/icon-gem.png"),
-};
+import { colors, fonts, WORLDS, worldForLevel } from "../src/theme/theme";
 
 export default function HomeScreen() {
-  const levelNumber = useProgress((state) => state.levelNumber);
-  const totalStars = useProgress((state) => state.totalStars);
-  const results = useProgress((state) => state.results);
-  const dailyCompletedDate = useProgress((state) => state.dailyCompletedDate);
-  const wallet = useProgress((state) => state.wallet);
-  const currentWorldIndex = Math.max(0, WORLDS.findIndex((world) => world.id === worldForLevel(levelNumber).id));
-  const [worldIndex, setWorldIndex] = useState(currentWorldIndex);
-  const world = WORLDS[worldIndex] ?? WORLDS[0];
-  const locked = totalStars < world.unlockStars;
-  const dailyOpen = dailyCompletedDate !== formatDate(new Date());
-  const rewardReady = wallet.laser + wallet.lineSplit + wallet.rotate + wallet.extraCut > 0;
-  const nodes = levelWindow(levelNumber);
-  const worldProgress = (((levelNumber - 1) % 30) + 1) / 30;
-
+  const { width, height } = useWindowDimensions();
+  const desktop = width >= 800;
+  const { levelNumber, totalStars, results, dailyCompletedDate } =
+    useProgress();
+  const world = worldForLevel(levelNumber);
+  const currentWorld = WORLDS.indexOf(world) + 1;
+  const start = Math.floor((levelNumber - 1) / 30) * 30 + 1;
+  const cleared = Array.from(
+    { length: 30 },
+    (_, i) => results[progressKey("campaign", start + i)],
+  ).filter(Boolean).length;
+  const dailyDone = dailyCompletedDate === formatDate(new Date());
+  const play = () =>
+    router.push({
+      pathname: "/play",
+      params: { source: "campaign", level: String(levelNumber) },
+    });
+  const nodes = Array.from(
+    { length: 5 },
+    (_, i) => Math.max(start, levelNumber - 2) + i,
+  ).filter((n) => n < start + 30);
   return (
-    <View style={styles.root}>
-      <Image source={art.background} style={styles.background} resizeMode="cover" />
-      <Screen style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <View style={styles.top}>
-            <View style={styles.profile}>
-              <Image source={art.avatar} style={styles.avatar} />
-              <View style={styles.profileCopy}>
-                <Text style={styles.player}>Player</Text>
-                <View style={styles.barTrack}>
-                  <View style={[styles.barFill, { width: `${Math.round(worldProgress * 100)}%` }]} />
-                </View>
-              </View>
-              <Text style={styles.level}>Lv. {levelNumber}</Text>
-            </View>
-            <View style={styles.currencies}>
-              <CurrencyChip source={art.coin} />
-              <CurrencyChip source={art.gem} />
-            </View>
-            <Pressable onPress={() => router.push("/settings")} style={styles.gear}>
-              <Image source={art.settings} style={styles.gearIcon} />
-            </Pressable>
+    <Screen wide>
+      <View style={styles.header}>
+        <View style={styles.brand}>
+          <View style={styles.brandMark}>
+            <Icon name="grid" size={22} color={colors.cream} />
           </View>
-
-          <Image source={art.logo} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.tag}>Cut. Fit. Satisfy.</Text>
-
-          <View style={styles.stage}>
-            <View style={styles.rail}>
-              <RailButton label="Daily Challenge" source={art.daily} badge={dailyOpen} onPress={() => router.push("/daily")} />
-              <RailButton label="Rewards" source={art.rewards} badge={rewardReady} onPress={() => router.push("/tools")} />
-              <RailButton label="Leaderboard" source={art.leaderboard} />
-            </View>
-            <View style={styles.scene}>
-              <Image source={art.diorama} style={styles.diorama} resizeMode="contain" />
-              <View style={styles.mascot}>
-                <View style={styles.bubble}>
-                  <Text style={styles.bubbleText}>Small cuts create big joys!</Text>
-                </View>
-                <Image source={art.tabi} style={styles.tabi} resizeMode="contain" />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.worldCard}>
-            <Pressable onPress={() => setWorldIndex((index) => (index + WORLDS.length - 1) % WORLDS.length)} style={styles.arrow}>
-              <Text style={styles.arrowText}>‹</Text>
-            </Pressable>
-            <View style={styles.worldCopy}>
-              <Text style={styles.worldKicker}>World {worldIndex + 1}</Text>
-              <Text style={styles.worldName}>{world.name}</Text>
-              <Text style={styles.worldSub}>{locked ? `Needs ${world.unlockStars} stars` : world.subtitle}</Text>
-            </View>
-            <Pressable onPress={() => setWorldIndex((index) => (index + 1) % WORLDS.length)} style={styles.arrow}>
-              <Text style={styles.arrowText}>›</Text>
-            </Pressable>
-          </View>
-          <View style={styles.dots}>
-            {WORLDS.map((item, index) => (
-              <View key={item.id} style={[styles.dot, index === worldIndex && styles.dotOn]} />
-            ))}
-          </View>
-
-          <Pressable
-            onPress={() => router.push({ pathname: "/intro", params: { source: "campaign", level: String(levelNumber) } })}
-            style={styles.play}
-          >
-            <Text style={styles.playLabel}>▶  Play</Text>
-            <Text style={styles.playLevel}>Level {levelNumber}</Text>
-          </Pressable>
-
-          <View style={styles.nodes}>
-            {nodes.map((level) => {
-              const stars = results[progressKey("campaign", level)]?.stars ?? 0;
-              const current = level === levelNumber;
-              const open = level <= levelNumber;
-              return (
-                <Pressable
-                  key={level}
-                  disabled={!open}
-                  onPress={() => router.push({ pathname: "/intro", params: { source: "campaign", level: String(level) } })}
-                  style={[styles.node, current && styles.nodeNow, !open && styles.nodeLocked]}
-                >
-                  <Text style={[styles.nodeText, current && styles.nodeTextNow]}>{open ? level : "🔒"}</Text>
-                  {open ? <Text style={styles.stars}>{"★".repeat(stars)}{"☆".repeat(3 - stars)}</Text> : null}
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.dock}>
-            <DockButton label="Skins" source={art.skins} onPress={() => router.push({ pathname: "/skins", params: { tab: "Blocks" } })} />
-            <DockButton label="Trays" source={art.trays} onPress={() => router.push({ pathname: "/skins", params: { tab: "Trays" } })} />
-            <DockButton label="Worlds" source={art.worlds} onPress={() => router.push("/worlds")} />
-            <DockButton label="Shop" source={art.shop} />
-          </View>
-        </ScrollView>
-      </Screen>
-    </View>
-  );
-}
-
-function levelWindow(levelNumber: number): number[] {
-  const start = Math.max(1, levelNumber - 3);
-  return Array.from({ length: 6 }, (_, index) => start + index);
-}
-
-function CurrencyChip({ source }: { source: number }) {
-  return (
-    <View style={styles.chip}>
-      <Image source={source} style={styles.chipIcon} />
-      <Text style={styles.chipValue}>0</Text>
-      <View style={styles.plus}>
-        <Text style={styles.plusText}>+</Text>
-      </View>
-    </View>
-  );
-}
-
-function RailButton({
-  label,
-  source,
-  badge = false,
-  onPress,
-}: {
-  label: string;
-  source: number;
-  badge?: boolean;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.railButton}>
-      <Image source={source} style={styles.railIcon} />
-      <Text style={styles.railLabel}>{label}</Text>
-      {badge ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>1</Text>
+          <Text style={[styles.brandText, width < 380 && { fontSize: 22 }]}>
+            bento blocks<Text style={{ color: colors.coral }}>.</Text>
+          </Text>
         </View>
-      ) : null}
-    </Pressable>
+        <View style={styles.headerRight}>
+          <View
+            accessibilityLabel={`${totalStars} stars earned`}
+            style={styles.starChip}
+          >
+            <Icon name="star" size={17} color={colors.gold} filled />
+            <Text style={styles.starCount}>{totalStars}</Text>
+            {desktop && <Text style={styles.starCaption}>stars collected</Text>}
+          </View>
+          <IconButton
+            name="settings"
+            label="Settings"
+            onPress={() => router.push("/settings")}
+          />
+        </View>
+      </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        <View
+          style={[
+            styles.greeting,
+            desktop && {
+              marginTop: height < 820 ? 20 : 30,
+              marginBottom: height < 820 ? 20 : 30,
+            },
+          ]}
+        >
+          <View style={styles.eyebrowRow}>
+            <View style={styles.tinyDot} />
+            <Eyebrow>A small moment, just for you</Eyebrow>
+          </View>
+          <Text
+            style={[styles.title, desktop && { fontSize: 52, lineHeight: 61 }]}
+          >
+            A little pause.{desktop ? " " : "\n"}
+            <Text style={styles.titleAccent}>A perfect fit.</Text>
+          </Text>
+          <Text style={styles.subtitle}>
+            Slice, arrange, and find your flow.
+          </Text>
+        </View>
+        <View style={[styles.main, desktop && styles.mainWide]}>
+          <View
+            style={[
+              styles.hero,
+              desktop && { flex: 1.65, minHeight: height < 820 ? 340 : 420 },
+            ]}
+          >
+            <View style={styles.heroTop}>
+              <Eyebrow color={colors.accent}>
+                {desktop ? "Your next little challenge" : "Your next bento"}
+              </Eyebrow>
+              <View style={styles.pill}>
+                <View style={styles.tinyDot} />
+                <Text style={styles.pillText}>No rush</Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.art,
+                {
+                  height: desktop
+                    ? height < 820
+                      ? 200
+                      : 260
+                    : height < 740
+                      ? 180
+                      : 225,
+                },
+              ]}
+            >
+              <BentoArt />
+            </View>
+            <View
+              style={[
+                styles.heroBottom,
+                width < 380 && {
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  style={[styles.worldTitle, !desktop && { fontSize: 20 }]}
+                >
+                  {world.name}
+                </Text>
+                <Text style={styles.heroSub}>
+                  World {String(currentWorld).padStart(2, "0")} · Level{" "}
+                  {levelNumber}
+                </Text>
+              </View>
+              <View style={{ minWidth: desktop ? 180 : 144 }}>
+                <Button
+                  label={`Play level ${levelNumber}`}
+                  icon="arrow"
+                  onPress={play}
+                  disabled={totalStars < world.unlockStars}
+                />
+              </View>
+            </View>
+          </View>
+          <View style={[styles.side, desktop && { flex: 1 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                dailyDone
+                  ? "View completed daily bento"
+                  : "Play the daily bento"
+              }
+              onPress={() => router.push("/daily")}
+              style={({ pressed }) => [
+                styles.daily,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <View style={styles.cardTop}>
+                <View style={styles.sunBadge}>
+                  <Icon
+                    name={dailyDone ? "check" : "sun"}
+                    size={25}
+                    color="#9D7541"
+                  />
+                </View>
+                <Text style={styles.smallTag}>
+                  {dailyDone ? "COMPLETE" : "FRESH TODAY"}
+                </Text>
+              </View>
+              <Text style={styles.cardTitle}>The daily bento</Text>
+              <Text style={styles.cardCopy}>
+                {dailyDone
+                  ? "Beautifully packed. A fresh puzzle arrives tomorrow."
+                  : "One fresh puzzle. A delicious little ritual."}
+              </Text>
+              <View style={styles.textLink}>
+                <Text style={styles.linkText}>
+                  {dailyDone ? "View your streak" : "Give it a taste"}
+                </Text>
+                <Icon name="arrow" size={18} />
+              </View>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/skins")}
+              style={({ pressed }) => [
+                styles.collection,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <View style={styles.swatches}>
+                <View
+                  style={[
+                    styles.swatch,
+                    {
+                      backgroundColor: colors.coral,
+                      transform: [{ rotate: "-12deg" }],
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.swatch,
+                    {
+                      backgroundColor: "#E8CA78",
+                      marginLeft: -12,
+                      transform: [{ rotate: "9deg" }],
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.swatch,
+                    {
+                      backgroundColor: "#91A97D",
+                      marginLeft: -12,
+                      transform: [{ rotate: "-5deg" }],
+                    },
+                  ]}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.collectionTitle}>Make it yours</Text>
+                <Text style={styles.cardCopy}>
+                  A little flavor for your bento.
+                </Text>
+              </View>
+              <Icon name="arrow" size={20} />
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.journey}>
+          <View style={styles.sectionHeading}>
+            <View>
+              <Eyebrow>Your journey</Eyebrow>
+              <Text style={styles.journeyTitle}>
+                One lovely little level at a time.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/worlds")}
+              style={styles.allLevels}
+            >
+              <Text style={styles.linkText}>All levels</Text>
+              <Icon name="arrow" size={17} />
+            </Pressable>
+          </View>
+          <View
+            style={[
+              styles.journeyBody,
+              desktop && {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 42,
+              },
+            ]}
+          >
+            <View style={[styles.progressCopy, desktop && { width: 210 }]}>
+              <View style={styles.progressLabels}>
+                <Text style={styles.progressText}>{world.name}</Text>
+                <Text style={styles.progressCount}>{cleared} / 30</Text>
+              </View>
+              <View style={styles.track}>
+                <View
+                  style={[styles.fill, { width: `${(cleared / 30) * 100}%` }]}
+                />
+              </View>
+            </View>
+            <View style={styles.nodes}>
+              {nodes.map((n) => {
+                const current = n === levelNumber;
+                const open =
+                  n <= levelNumber && totalStars >= world.unlockStars;
+                const stars = results[progressKey("campaign", n)]?.stars ?? 0;
+                return (
+                  <Pressable
+                    key={n}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Level ${n}${!open ? ", locked" : current ? ", current" : `, ${stars} stars`}`}
+                    disabled={!open}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/play",
+                        params: { source: "campaign", level: String(n) },
+                      })
+                    }
+                    style={[styles.node, current && styles.nodeCurrent]}
+                  >
+                    <View
+                      style={[
+                        styles.nodeCircle,
+                        current && { backgroundColor: colors.accent },
+                        !open && { backgroundColor: "#ECEEE4" },
+                      ]}
+                    >
+                      {open ? (
+                        <Text
+                          style={[
+                            styles.nodeNumber,
+                            current && { color: colors.cream },
+                          ]}
+                        >
+                          {n}
+                        </Text>
+                      ) : (
+                        <Icon name="lock" size={17} color="#A2AA98" />
+                      )}
+                    </View>
+                    {current ? (
+                      <Text style={styles.nowLabel}>YOU ARE HERE</Text>
+                    ) : stars > 0 ? (
+                      <Stars value={stars} size={10} />
+                    ) : (
+                      <Text style={styles.levelLabel}>Level {n}</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/how-to")}
+          style={styles.footer}
+        >
+          <Icon name="help" size={16} color={colors.inkSoft} />
+          <Text style={styles.footerText}>
+            New to the kitchen? Here’s how to play.
+          </Text>
+        </Pressable>
+      </ScrollView>
+      <Navigation />
+    </Screen>
   );
 }
-
-function DockButton({ label, source, onPress }: { label: string; source: number; onPress?: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={styles.dockButton}>
-      <Image source={source} style={styles.dockIcon} />
-      <Text style={styles.dockLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#E7C49A" },
-  background: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
-  screen: { flex: 1, backgroundColor: "transparent", paddingHorizontal: 12 },
-  scroll: { paddingBottom: 12 },
-  top: { flexDirection: "row", alignItems: "center", gap: 6 },
-  profile: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "#FFF8EF",
-    borderRadius: 22,
-    paddingRight: 8,
-    paddingVertical: 4,
-    paddingLeft: 4,
-    flexShrink: 1,
+    justifyContent: "space-between",
+    paddingBottom: 18,
+    borderBottomWidth: 1,
+    borderColor: colors.line,
+    gap: 10,
   },
-  avatar: { width: 34, height: 34, borderRadius: 17 },
-  profileCopy: { width: 72 },
-  player: { fontWeight: "900", color: colors.ink, fontSize: 12 },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: "#E7D3BC", marginTop: 3, overflow: "hidden" },
-  barFill: { height: 6, borderRadius: 3, backgroundColor: "#F6C445" },
-  level: { fontWeight: "900", color: colors.inkSoft, fontSize: 11 },
-  currencies: { flexDirection: "row", gap: 4, marginLeft: "auto" },
-  chip: {
-    flexDirection: "row",
+  brand: { flexDirection: "row", alignItems: "center", gap: 10 },
+  brandMark: {
+    width: 36,
+    height: 36,
+    backgroundColor: colors.accent,
+    borderRadius: 11,
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFF8EF",
-    borderRadius: 16,
-    paddingLeft: 4,
-    paddingRight: 3,
-    paddingVertical: 3,
-    gap: 3,
   },
-  chipIcon: { width: 18, height: 18 },
-  chipValue: { fontWeight: "900", color: colors.ink, fontSize: 12 },
-  plus: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#F6C445", alignItems: "center", justifyContent: "center" },
-  plusText: { color: "#FFF8EF", fontWeight: "900", fontSize: 12, lineHeight: 14 },
-  gear: {
-    width: 40,
-    height: 40,
+  brandText: {
+    fontFamily: fonts.display,
+    fontSize: 25,
+    color: colors.ink,
+    letterSpacing: -1,
+  },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 14 },
+  starChip: { flexDirection: "row", gap: 6, alignItems: "center" },
+  starCount: { color: colors.ink, fontSize: 15, fontWeight: "600" },
+  starCaption: { color: colors.inkSoft, fontSize: 12 },
+  content: { paddingBottom: 12 },
+  greeting: { marginTop: 26, marginBottom: 25 },
+  eyebrowRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  tinyDot: {
+    height: 5,
+    width: 5,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
+  title: {
+    fontFamily: fonts.display,
+    fontSize: 37,
+    lineHeight: 44,
+    letterSpacing: -1.3,
+    color: colors.ink,
+    marginTop: 12,
+  },
+  titleAccent: { color: colors.accent },
+  subtitle: { color: colors.inkSoft, fontSize: 14, marginTop: 10 },
+  main: { gap: 18 },
+  mainWide: { flexDirection: "row" },
+  hero: {
+    backgroundColor: colors.sage,
+    borderRadius: 28,
+    padding: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#DCE4CF",
+  },
+  heroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+    alignItems: "center",
+  },
+  pill: {
+    flexDirection: "row",
+    gap: 5,
+    alignItems: "center",
+    backgroundColor: "#F2F5EA",
     borderRadius: 20,
-    backgroundColor: "#5C4033",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gearIcon: { width: 24, height: 24 },
-  logo: { width: "78%", height: 72, alignSelf: "center", marginTop: 4 },
-  tag: { textAlign: "center", color: colors.ink, fontWeight: "800", marginBottom: 4 },
-  stage: { flexDirection: "row", alignItems: "flex-end", minHeight: 230 },
-  rail: { width: 74, gap: 8, marginBottom: 28 },
-  railButton: {
-    backgroundColor: "#5C4033",
-    borderRadius: 16,
-    padding: 6,
-    alignItems: "center",
-    minHeight: 68,
-  },
-  railIcon: { width: 30, height: 30, borderRadius: 8 },
-  railLabel: { color: "#FFF8EF", fontSize: 9, fontWeight: "800", textAlign: "center", marginTop: 3 },
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: "#E15B4A",
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeText: { color: "#FFF8EF", fontSize: 11, fontWeight: "900" },
-  scene: { flex: 1, height: 230 },
-  diorama: { width: "100%", height: 210 },
-  mascot: { position: "absolute", right: 0, bottom: 18, alignItems: "flex-end" },
-  bubble: {
-    backgroundColor: "#FFF8EF",
-    borderRadius: 14,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 6,
-    maxWidth: 108,
-    marginBottom: 2,
   },
-  bubbleText: { color: colors.ink, fontSize: 11, fontWeight: "800", textAlign: "center" },
-  tabi: { width: 108, height: 132 },
-  worldCard: {
-    marginTop: -36,
-    backgroundColor: "#FFF6E8",
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "#C48A4A",
+  pillText: { fontSize: 10, color: colors.accent },
+  art: { width: "100%", height: 225, marginVertical: 4 },
+  heroBottom: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    gap: 12,
+    marginTop: "auto",
   },
-  arrow: { width: 36, alignItems: "center" },
-  arrowText: { fontSize: 28, color: colors.ink, fontWeight: "700" },
-  worldCopy: { flex: 1, alignItems: "center" },
-  worldKicker: { color: colors.inkSoft, fontWeight: "800", fontSize: 12 },
-  worldName: { fontSize: 22, fontWeight: "900", color: colors.ink },
-  worldSub: { color: colors.inkSoft, fontWeight: "700", textAlign: "center", fontSize: 12 },
-  dots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 8 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#C9A27A" },
-  dotOn: { backgroundColor: "#F6C445", width: 16 },
-  play: {
-    marginTop: 10,
-    backgroundColor: "#F6C445",
-    borderRadius: 32,
-    minHeight: 72,
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: 4,
-    borderBottomColor: "#D89A22",
-  },
-  playLabel: { fontSize: 28, fontWeight: "900", color: "#FFF8EF" },
-  playLevel: { color: "#FFF8EF", fontWeight: "800", marginTop: -2 },
-  nodes: { flexDirection: "row", gap: 6, marginTop: 12 },
-  node: {
+  worldTitle: { fontFamily: fonts.display, color: colors.ink, fontSize: 25 },
+  heroSub: { fontSize: 12, color: colors.inkSoft, marginTop: 6 },
+  side: { gap: 16 },
+  daily: {
     flex: 1,
-    backgroundColor: "#FFF8EF",
-    borderRadius: 14,
-    minHeight: 64,
+    borderRadius: 26,
+    padding: 26,
+    backgroundColor: colors.peach,
+    borderWidth: 1,
+    borderColor: "#ECDAC7",
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 19,
+  },
+  sunBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "#F4D9B8",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
   },
-  nodeNow: { backgroundColor: "#3C2A22" },
-  nodeLocked: { backgroundColor: "#E4D3C0" },
-  nodeText: { fontWeight: "900", color: colors.ink, fontSize: 16 },
-  nodeTextNow: { color: "#F6C445" },
-  stars: { color: "#E0A106", fontSize: 8, marginTop: 2 },
-  dock: {
-    marginTop: 14,
-    backgroundColor: "#5C4033",
-    borderRadius: 22,
+  smallTag: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#906D4A",
+    letterSpacing: 1.4,
+  },
+  cardTitle: { fontFamily: fonts.display, fontSize: 28, color: colors.ink },
+  cardCopy: {
+    color: colors.inkSoft,
+    fontSize: 13,
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  textLink: {
     flexDirection: "row",
-    padding: 8,
+    gap: 10,
+    alignItems: "center",
+    marginTop: 22,
   },
-  dockButton: { flex: 1, alignItems: "center", paddingVertical: 6 },
-  dockIcon: { width: 36, height: 36, borderRadius: 10 },
-  dockLabel: { color: "#FFF8EF", fontWeight: "800", marginTop: 4, fontSize: 11 },
+  linkText: { fontSize: 12, color: colors.ink, fontWeight: "600" },
+  collection: {
+    backgroundColor: colors.cream,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+    padding: 22,
+    minHeight: 113,
+  },
+  swatches: { flexDirection: "row", alignItems: "center", width: 64 },
+  swatch: {
+    width: 27,
+    height: 35,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.cream,
+  },
+  collectionTitle: { fontSize: 16, color: colors.ink, fontWeight: "600" },
+  journey: {
+    marginTop: 28,
+    padding: 24,
+    borderRadius: 24,
+    backgroundColor: colors.cream,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  sectionHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  journeyTitle: {
+    fontFamily: fonts.display,
+    fontSize: 20,
+    color: colors.ink,
+    marginTop: 8,
+    maxWidth: 230,
+  },
+  allLevels: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 44,
+  },
+  journeyBody: { marginTop: 20, gap: 20 },
+  progressCopy: { gap: 10 },
+  progressLabels: { flexDirection: "row", justifyContent: "space-between" },
+  progressText: { fontSize: 12, color: colors.ink },
+  progressCount: { fontSize: 11, color: colors.inkSoft },
+  track: {
+    height: 5,
+    backgroundColor: colors.sage,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  fill: { height: "100%", backgroundColor: colors.accent, borderRadius: 3 },
+  nodes: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  node: { alignItems: "center", flex: 1, gap: 8 },
+  nodeCurrent: {},
+  nodeCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: colors.sage,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nodeNumber: { color: colors.accent, fontSize: 15, fontWeight: "600" },
+  nowLabel: {
+    color: colors.accent,
+    fontSize: 7,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+  levelLabel: { color: colors.inkSoft, fontSize: 9 },
+  footer: {
+    minHeight: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  footerText: { color: colors.inkSoft, fontSize: 11 },
 });

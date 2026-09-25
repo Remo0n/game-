@@ -1,44 +1,91 @@
+import { Text } from "../src/components/Typography";
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
-import { Button, Screen } from "../src/components/ui";
-import type { Variation } from "../src/engine/types";
+import { Pressable, View } from "react-native";
+import { Icon } from "../src/components/Icon";
+import { Eyebrow, Page, textStyles } from "../src/components/ui";
 import { useProgress } from "../src/game/progressStore";
 import { colors } from "../src/theme/theme";
-
-const MODES: Array<{ id: Variation; name: string; copy: string }> = [
-  { id: "NORMAL", name: "Normal", copy: "Standard rules" },
-  { id: "ONE_CUT", name: "One Cut", copy: "Solve using only 1 cut" },
-  { id: "NO_ROTATION", name: "No Rotation", copy: "Pieces cannot be rotated" },
-  { id: "EXACT_FIT", name: "Exact Fit", copy: "No empty cells" },
-  { id: "TIMED", name: "Timed", copy: "Solve before time runs out" },
-  { id: "MULTI_BLOCK", name: "Multi Block", copy: "Start with multiple blocks" },
-];
-
+const MODES = [
+  {
+    id: "NORMAL",
+    name: "The classic",
+    copy: "A comforting mix of cuts and clever fits.",
+    icon: "grid",
+  },
+  {
+    id: "ONE_CUT",
+    name: "One perfect slice",
+    copy: "Just one cut. Make it a good one.",
+    icon: "cut",
+  },
+  {
+    id: "NO_ROTATION",
+    name: "As they are",
+    copy: "Find a home for every piece without turning it.",
+    icon: "lock",
+  },
+  {
+    id: "EXACT_FIT",
+    name: "Every little square",
+    copy: "No gaps. No leftovers. A perfectly packed tray.",
+    icon: "check",
+  },
+  {
+    id: "TIMED",
+    name: "Lunch rush",
+    copy: "A little more pace. Beat the clock.",
+    icon: "clock",
+  },
+  {
+    id: "MULTI_BLOCK",
+    name: "A mixed bento",
+    copy: "More starting blocks, more possibilities.",
+    icon: "palette",
+  },
+] as const;
 export default function VariationsScreen() {
-  const levels = useProgress((state) => state.variationLevel);
+  const levels = useProgress((s) => s.variationLevel);
   return (
-    <Screen>
-      <Text style={styles.title}>Level Variations</Text>
+    <Page
+      title="A change of flavor"
+      subtitle="Six ways to find your flow"
+      icon="spark"
+    >
       {MODES.map((mode) => (
-        <View key={mode.id} style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{mode.name}</Text>
-            <Text style={styles.copy}>{mode.copy} · level {levels[mode.id]}</Text>
+        <Pressable
+          key={mode.id}
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/play",
+              params: {
+                source: "variation",
+                variation: mode.id,
+                level: String(levels[mode.id]),
+              },
+            })
+          }
+          style={({ pressed }) => ({
+            padding: 24,
+            borderRadius: 24,
+            backgroundColor: colors.cream,
+            borderWidth: 1,
+            borderColor: colors.line,
+            gap: 16,
+            flexDirection: "row",
+            alignItems: "center",
+            opacity: pressed ? 0.75 : 1,
+          })}
+        >
+          <Icon name={mode.icon} size={26} color={colors.accent} />
+          <View style={{ flex: 1, gap: 7 }}>
+            <Eyebrow>Level {levels[mode.id]}</Eyebrow>
+            <Text style={textStyles.heading}>{mode.name}</Text>
+            <Text style={textStyles.body}>{mode.copy}</Text>
           </View>
-          <Button
-            label="Play"
-            onPress={() => router.push({ pathname: "/intro", params: { source: "variation", variation: mode.id, level: String(levels[mode.id]) } })}
-          />
-        </View>
+          <Icon name="arrow" size={18} />
+        </Pressable>
       ))}
-      <Button label="Back" tone="cream" onPress={() => router.back()} />
-    </Screen>
+    </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  title: { fontSize: 32, fontWeight: "900", color: colors.ink, marginBottom: 8 },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
-  name: { fontWeight: "800", color: colors.ink, fontSize: 16 },
-  copy: { color: colors.inkSoft },
-});

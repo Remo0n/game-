@@ -1,6 +1,15 @@
-import { campaignVariation, generateLevel } from "../engine/generator/generateLevel";
+import {
+  campaignVariation,
+  generateLevel,
+} from "../engine/generator/generateLevel";
+import { campaignPlan, variationPlan } from "../engine/generator/progression";
 import { dailySeed } from "../engine/generator/daily";
-import type { Difficulty, LevelDefinition, PlayableLevel, Variation } from "../engine/types";
+import type {
+  Difficulty,
+  LevelDefinition,
+  PlayableLevel,
+  Variation,
+} from "../engine/types";
 import { rememberSolution } from "./vault";
 
 const cache = new Map<string, LevelDefinition>();
@@ -11,17 +20,32 @@ export function sealLevel(level: LevelDefinition): PlayableLevel {
   return playable;
 }
 
-export function loadCampaignLevel(seed: number, levelNumber: number, recentSignatures: string[]): LevelDefinition {
-  const variation = levelNumber === 1 ? "NORMAL" : campaignVariation(seed, levelNumber);
+export function loadCampaignLevel(
+  seed: number,
+  levelNumber: number,
+  _recentSignatures: string[] = [],
+): LevelDefinition {
+  const variation =
+    levelNumber === 1 ? "NORMAL" : campaignVariation(seed, levelNumber);
   const key = `campaign:${seed}:${levelNumber}:${variation}`;
   const cached = cache.get(key);
   if (cached) return cached;
-  const level = generateLevel({ seed, levelNumber, variation, recentSignatures });
+  const level = generateLevel({
+    seed,
+    levelNumber,
+    variation,
+    progression: campaignPlan(levelNumber),
+  });
+  if (cache.size >= 100) cache.delete(cache.keys().next().value!);
   cache.set(key, level);
   return level;
 }
 
-export function loadVariationLevel(seed: number, variation: Variation, levelNumber: number): LevelDefinition {
+export function loadVariationLevel(
+  seed: number,
+  variation: Variation,
+  levelNumber: number,
+): LevelDefinition {
   const key = `var:${seed}:${variation}:${levelNumber}`;
   const cached = cache.get(key);
   if (cached) return cached;
@@ -30,13 +54,17 @@ export function loadVariationLevel(seed: number, variation: Variation, levelNumb
     levelNumber,
     variation,
     skipTutorial: true,
-    difficulty: levelNumber < 4 ? "EASY" : undefined,
+    progression: variationPlan(variation, levelNumber),
   });
+  if (cache.size >= 100) cache.delete(cache.keys().next().value!);
   cache.set(key, level);
   return level;
 }
 
-export function loadDailyLevel(date: string, version?: string): LevelDefinition {
+export function loadDailyLevel(
+  date: string,
+  version?: string,
+): LevelDefinition {
   const seed = dailySeed(date, version);
   const key = `daily:${date}:${seed}`;
   const cached = cache.get(key);
@@ -48,6 +76,7 @@ export function loadDailyLevel(date: string, version?: string): LevelDefinition 
     skipTutorial: true,
     difficulty: "MEDIUM",
   });
+  if (cache.size >= 100) cache.delete(cache.keys().next().value!);
   cache.set(key, level);
   return level;
 }

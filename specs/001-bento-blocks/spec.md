@@ -167,7 +167,7 @@ A developer can type a seed, difficulty, level number, and variation, rebuild th
 - **FR-009**: The same generator version, seed, level number, and variation MUST always produce the same puzzle.
 - **FR-010**: Every offered puzzle MUST be connected, area-balanced, and solvable by replaying its hidden solution. The hidden solution MUST NOT appear on the play screen.
 - **FR-011**: Difficulty MUST be an internal score from 0 through 100, classified as Easy (0–24), Medium (25–49), Hard (50–74), and Very Hard (75–100).
-- **FR-012**: Campaign difficulty MUST rise with level number along a smooth curve that matches the early anchors (about 5 at level 1, about 12 at level 10, about 27 at level 30, about 48 at level 75, about 69 at level 150, and about 84 at level 300) and then stay in the hardest band.
+- **FR-012**: Campaign difficulty MUST follow the teach, practice, challenge, and recovery curriculum in [DIFFICULTY_PROGRESSION.md](../../DIFFICULTY_PROGRESSION.md). Its baseline MUST rise gradually and eventually plateau, while individual recovery levels deliberately become easier. New rules MUST be introduced separately, and timed play MUST remain optional.
 - **FR-013**: Recent puzzles MUST be compared by a signature, and a candidate that is too similar to one of the last 80 MUST be rejected when another candidate exists.
 - **FR-014**: The game MUST support Normal, One Cut, No Rotation, Exact Fit, Timed, and Multi Block as endless variations with separate counters.
 - **FR-015**: Laser Cut, Line Split, Rotate Piece, and Extra Cut MUST be optional charges. None of them is required to solve a puzzle.

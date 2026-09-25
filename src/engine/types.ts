@@ -1,3 +1,4 @@
+import type { ProgressionPlan } from "./generator/progression";
 export const GENERATOR_VERSION = "1.0.0";
 export const BOARD_SIZE = 8;
 
@@ -84,6 +85,7 @@ export interface LevelDefinition {
   primitiveFamily: string;
   signature: string;
   rejectedCandidates: number;
+  progression?: ProgressionPlan;
   kit: ToolKit;
   solution: Solution;
 }
@@ -98,6 +100,7 @@ export interface GenerateInput {
   difficulty?: Difficulty;
   recentSignatures?: string[];
   skipTutorial?: boolean;
+  progression?: ProgressionPlan;
 }
 
 export interface LaserLine {

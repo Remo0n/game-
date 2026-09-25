@@ -1,89 +1,205 @@
+import { Text } from "../src/components/Typography";
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Tabi } from "../src/components/Tabi";
-import { Button, Screen } from "../src/components/ui";
-import { useProgress } from "../src/game/progressStore";
-import { colors, WORLDS, worldForLevel } from "../src/theme/theme";
-
+import { useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Icon } from "../src/components/Icon";
+import {
+  Eyebrow,
+  IconButton,
+  Page,
+  Panel,
+  Stars,
+  textStyles,
+} from "../src/components/ui";
+import { journeyPage } from "../src/game/journey";
+import { progressKey, useProgress } from "../src/game/progressStore";
+import { colors, fonts, WORLDS, worldForLevel } from "../src/theme/theme";
 export default function WorldsScreen() {
-  const levelNumber = useProgress((state) => state.levelNumber);
-  const totalStars = useProgress((state) => state.totalStars);
-  const results = useProgress((state) => state.results);
-  const world = worldForLevel(levelNumber);
-
+  const { levelNumber, totalStars, results } = useProgress();
+  const [selected, setSelected] = useState<string>(
+    worldForLevel(levelNumber).id,
+  );
+  const [pages, setPages] = useState<Record<string, number>>({});
+  const world = WORLDS.find((item) => item.id === selected) ?? WORLDS[0];
+  const { start, end, page, lastPage } = journeyPage(
+    world.start,
+    levelNumber,
+    pages[world.id],
+  );
+  const unlocked = totalStars >= world.unlockStars;
   return (
-    <Screen>
-      <Text style={styles.kicker}>Tabi the Cat</Text>
-      <Text style={styles.title}>Worlds</Text>
-      <ScrollView contentContainerStyle={{ gap: 12, paddingBottom: 20 }}>
-        {WORLDS.map((item) => {
-          const unlocked = totalStars >= item.unlockStars;
-          const cleared = Array.from({ length: 30 }, (_, index) => bandStartOf(item.start) + index).filter((level) => {
-            const key = Object.keys(results).find((entry) => entry.endsWith(`:campaign:${level}`));
-            return key ? results[key].stars > 0 : false;
-          }).length;
+    <Page
+      title="Your little journey"
+      subtitle={`${totalStars} stars collected · A whole world of good fits`}
+      icon="grid"
+    >
+      <Text style={textStyles.title}>Every bento is a new beginning.</Text>
+      <View style={styles.worlds}>
+        {WORLDS.map((item, i) => {
+          const open = totalStars >= item.unlockStars;
           return (
-            <View key={item.id} style={[styles.card, !unlocked && styles.locked]}>
-              <Text style={styles.cardTitle}>{unlocked ? item.name : `${item.name}  locked`}</Text>
-              <Text style={styles.sub}>{item.subtitle}</Text>
-              <Text style={styles.sub}>{unlocked ? `${Math.min(30, cleared)}/30 cleared · ${item.unlockStars} stars to open` : `Needs ${item.unlockStars} stars`}</Text>
-            </View>
+            <Pressable
+              key={item.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: selected === item.id }}
+              onPress={() => setSelected(item.id)}
+              style={[
+                styles.world,
+                selected === item.id && styles.worldSelected,
+              ]}
+            >
+              <View style={styles.worldTop}>
+                <Text style={styles.number}>0{i + 1}</Text>
+                <Icon
+                  name={open ? "grid" : "lock"}
+                  size={18}
+                  color={colors.accent}
+                />
+              </View>
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.sub}>
+                {open ? item.subtitle : `Unlock with ${item.unlockStars} stars`}
+              </Text>
+            </Pressable>
           );
         })}
-        <Text style={styles.sub}>Level {levelNumber} · {world.name} · {totalStars} stars</Text>
+      </View>
+      <Panel>
+        <View style={styles.section}>
+          <View style={{ flex: 1 }}>
+            <Eyebrow>
+              {unlocked
+                ? "Pick a little challenge"
+                : "Something to look forward to"}
+            </Eyebrow>
+            <Text style={styles.heading}>{world.name}</Text>
+          </View>
+          <Icon name={unlocked ? "spark" : "lock"} color={colors.accent} />
+        </View>
+        {!unlocked && (
+          <Text style={textStyles.body}>
+            Collect {world.unlockStars - totalStars} more stars by replaying
+            earlier levels.
+          </Text>
+        )}
+        {lastPage > 0 && (
+          <View style={styles.pagination}>
+            <IconButton
+              name="back"
+              label="Earlier levels in this world"
+              disabled={page === 0}
+              onPress={() =>
+                setPages((current) => ({ ...current, [world.id]: page - 1 }))
+              }
+            />
+            <Text accessibilityLiveRegion="polite" style={styles.sub}>
+              Levels {start}–{end}
+            </Text>
+            <IconButton
+              name="arrow"
+              label="Later levels in this world"
+              disabled={page === lastPage}
+              onPress={() =>
+                setPages((current) => ({ ...current, [world.id]: page + 1 }))
+              }
+            />
+          </View>
+        )}
         <View style={styles.path}>
-          {Array.from({ length: 30 }, (_, index) => {
-            const level = (levelNumber <= 90 ? world.start : Math.floor((levelNumber - 1) / 30) * 30 + 1) + index;
-            const done = Object.entries(results).some(([key, value]) => key.endsWith(`:campaign:${level}`) && value.stars > 0);
-            const open = totalStars >= world.unlockStars && level <= levelNumber;
+          {Array.from({ length: 30 }, (_, i) => {
+            const n = start + i,
+              result = results[progressKey("campaign", n)],
+              open = unlocked && n <= levelNumber,
+              current = n === levelNumber;
             return (
               <Pressable
-                key={level}
+                key={n}
+                accessibilityRole="button"
+                accessibilityLabel={`Level ${n}${open ? (result ? `, ${result.stars} stars` : "") : ", locked"}`}
                 disabled={!open}
-                onPress={() => router.push({ pathname: "/intro", params: { source: "campaign", level: String(level) } })}
-                style={[styles.node, done && styles.nodeDone, level === levelNumber && styles.nodeNow]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/play",
+                    params: { source: "campaign", level: String(n) },
+                  })
+                }
+                style={[
+                  styles.node,
+                  current && styles.current,
+                  !open && { opacity: 0.5 },
+                ]}
               >
-                <Text style={styles.nodeText}>{level}</Text>
+                {open ? (
+                  <Text
+                    style={[styles.level, current && { color: colors.cream }]}
+                  >
+                    {n}
+                  </Text>
+                ) : (
+                  <Icon name="lock" size={17} color={colors.inkSoft} />
+                )}
+                {result ? (
+                  <Stars value={result.stars} size={9} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.levelCaption,
+                      current && { color: "#DFE8D6" },
+                    ]}
+                  >
+                    {current ? "PLAY" : String(n).padStart(2, "0")}
+                  </Text>
+                )}
               </Pressable>
             );
           })}
         </View>
-        <Tabi size={84} />
-        <Button
-          label={totalStars >= worldForLevel(levelNumber).unlockStars ? `Play level ${levelNumber}` : "Earn stars to continue"}
-          disabled={totalStars < worldForLevel(levelNumber).unlockStars}
-          onPress={() => router.push({ pathname: "/intro", params: { source: "campaign", level: String(levelNumber) } })}
-        />
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>Back</Text>
-        </Pressable>
-      </ScrollView>
-    </Screen>
+      </Panel>
+    </Page>
   );
 }
-
-function bandStartOf(start: number): number {
-  return start;
-}
-
 const styles = StyleSheet.create({
-  kicker: { color: colors.inkSoft, fontWeight: "700" },
-  title: { fontSize: 34, fontWeight: "900", color: colors.ink, marginBottom: 8 },
-  card: { backgroundColor: colors.cream, borderRadius: 22, padding: 14 },
-  locked: { opacity: 0.55 },
-  cardTitle: { fontSize: 20, fontWeight: "800", color: colors.ink },
-  sub: { color: colors.inkSoft, marginTop: 4 },
-  path: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  pagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  worlds: { gap: 12 },
+  world: {
+    padding: 20,
+    backgroundColor: colors.cream,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 22,
+    gap: 6,
+  },
+  worldSelected: { backgroundColor: colors.sage, borderColor: "#A4B68E" },
+  worldTop: { flexDirection: "row", justifyContent: "space-between" },
+  number: { color: colors.accent, fontSize: 11, letterSpacing: 2 },
+  name: { fontFamily: fonts.display, fontSize: 24, color: colors.ink },
+  sub: { fontSize: 13, color: colors.inkSoft },
+  section: { flexDirection: "row", alignItems: "center" },
+  heading: {
+    fontFamily: fonts.display,
+    fontSize: 27,
+    color: colors.ink,
+    marginTop: 8,
+  },
+  path: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 },
   node: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#E7D3BC",
+    width: "17%",
+    minWidth: 42,
+    flexGrow: 1,
+    maxWidth: 90,
+    minHeight: 68,
+    borderRadius: 16,
+    gap: 6,
+    backgroundColor: colors.sage,
     alignItems: "center",
     justifyContent: "center",
   },
-  nodeDone: { backgroundColor: colors.good },
-  nodeNow: { borderWidth: 3, borderColor: colors.accent },
-  nodeText: { color: colors.ink, fontWeight: "800", fontSize: 12 },
-  back: { textAlign: "center", color: colors.inkSoft, fontWeight: "700", marginTop: 8 },
+  current: { backgroundColor: colors.accent },
+  level: { fontWeight: "600", fontSize: 18, color: colors.ink },
+  levelCaption: { fontSize: 8, letterSpacing: 1, color: colors.inkSoft },
 });
